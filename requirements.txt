@@ -1,11 +1,11 @@
+streamlit
 langchain
 langchain-community
-langchain-core
-langchain-huggingface
 langchain-text-splitters
+langchain-groq
 chromadb
 sentence-transformers
-pypdf
 python-dotenv
-groq
-langchain-groq
+pysqlite3-binary
+Pillow
+torch
