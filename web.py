@@ -1,6 +1,9 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+import os
+
+if os.name != "nt":
+    __import__('pysqlite3')
+    import sys
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import streamlit as st
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -42,6 +45,20 @@ st.set_page_config(
     layout="wide"
 )
 
+# Session Defaults
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "user_email" not in st.session_state:
+    st.session_state.user_email = ""
+
+# Auto Login After Refresh
+if st.query_params.get("login") == "true":
+
+    st.session_state.logged_in = True
+
+    st.session_state.user_email = st.query_params.get("user")
+
 
 
 # Login Page
@@ -79,20 +96,14 @@ if not st.session_state.logged_in:
             )
 
             if login_btn:
-
-                if (
-                    login_email in users and
-                    users[login_email] == login_password
-                ):
-
+                if login_email in users and users[login_email] == login_password:
                     st.session_state.logged_in = True
-
+                    st.session_state.user_email = login_email
+                    st.query_params["login"] = "true"
+                    st.query_params["user"] = login_email
                     st.success("Login Successful")
-
                     st.rerun()
-
                 else:
-
                     st.error("Invalid Email or Password")
 
         # CREATE ACCOUNT TAB
@@ -108,6 +119,12 @@ if not st.session_state.logged_in:
                 type="password",
                 key="new_password"
             )
+            
+            confirm_password = st.text_input(
+    "Confirm Password",
+    type="password",
+    key="confirm_password"
+)
 
             create_btn = st.button(
                 "Create Account",
@@ -122,7 +139,13 @@ if not st.session_state.logged_in:
 
                 else:
 
-                    users[new_email] = new_password
+                    if new_password != confirm_password:
+
+                        st.error("Passwords do not match")
+
+                    else:
+
+                        users[new_email] = new_password
 
                     with open("users.json", "w") as file:
 
@@ -262,17 +285,19 @@ with st.sidebar:
     st.markdown("---")
 
     logout_btn = st.button(
-        "Logout",
-        use_container_width=True
-    )
-    
-    
+    "Logout",
+    use_container_width=True
+)
 
-    if logout_btn:
+if logout_btn:
 
-        st.session_state.logged_in = False
+    st.session_state.logged_in = False
 
-        st.rerun()
+    st.session_state.user_email = ""
+
+    st.query_params.clear()
+
+    st.rerun()
 
     st.markdown("---")
 
@@ -321,16 +346,21 @@ def load_rag():
     )
 
     # Vector DB
-    vectorstore = Chroma.from_documents(
-        docs,
-        embeddings,
-        persist_directory="./chroma_db"
-    )
+    if os.path.exists("./chroma_db"):
+        vectorstore = Chroma(
+            persist_directory="./chroma_db",
+            embedding_function=embeddings
+        )
+    else:
+        vectorstore = Chroma.from_documents(
+            docs,
+            embeddings,
+            persist_directory="./chroma_db"
+        )
 
     retriever = vectorstore.as_retriever()
 
     return retriever
-
 
 retriever = load_rag()
 
